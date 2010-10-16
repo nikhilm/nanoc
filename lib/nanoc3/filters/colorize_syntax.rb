@@ -78,7 +78,7 @@ module Nanoc3::Filters
 
         # Highlight
         highlighted_code = highlight(element.inner_text[match[0].length, element.inner_text.length].strip, language, params)
-        element.inner_html = highlighted_code.strip
+        element.inner_html = Nokogiri::XML::DocumentFragment::parse(highlighted_code.strip)
       end
 
       doc.to_s
