@@ -70,14 +70,14 @@ module Nanoc3::Filters
 
       # Colorize
       doc = klass.fragment(content)
-      doc.css('pre > code[class*="language-"]').each do |element|
+      doc.css('pre > code').each do |element|
         # Get language
-        match = element['class'].match(/(^| )language-([^ ]+)/)
+        match = element.inner_text.match(/^#!([^\n ]+)/)
         next if match.nil?
-        language = match[2]
+        language = match[1]
 
         # Highlight
-        highlighted_code = highlight(element.inner_text.strip, language, params)
+        highlighted_code = highlight(element.inner_text[match[0].length, element.inner_text.length].strip, language, params)
         element.inner_html = highlighted_code.strip
       end
 
@@ -129,7 +129,7 @@ module Nanoc3::Filters
         highlighted_code = io.read
 
         doc = Nokogiri::HTML.fragment(highlighted_code)
-        return doc.xpath('./div[@class="highlight"]/pre').inner_html
+        return doc.inner_html
       end
     end
 
