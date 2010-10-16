@@ -81,7 +81,7 @@ module Nanoc3::Filters
         element.inner_html = Nokogiri::XML::DocumentFragment::parse(highlighted_code.strip)
       end
 
-      doc.to_s
+      doc.to_html(:encoding => 'UTF-8')
     end
 
   private
