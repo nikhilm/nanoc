@@ -28,7 +28,7 @@ module Nanoc3::Helpers
     #
     # @return [Array] An array containing all articles
     def articles
-      @items.select { |item| item[:kind] == 'article' }
+      @items.select { |item| item[:kind] == 'blog_post' }
     end
 
     # Returns a sorted list of articles, i.e. items where the `kind`
