@@ -53,6 +53,7 @@ module Nanoc3::CLI
       add_command(Nanoc3::CLI::Commands::Update.new)
       add_command(Nanoc3::CLI::Commands::View.new)
       add_command(Nanoc3::CLI::Commands::Watch.new)
+      add_command(Nanoc3::CLI::Commands::CreateBlogEntry.new)
     end
 
     # Returns a fully initialised base instance. It is recommended to use this
