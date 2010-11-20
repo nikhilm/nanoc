@@ -79,7 +79,7 @@ module Nanoc3::CLI::Commands
           :author => "Nikhil Marathe",
           :kind => "blog_post",
           :created_at => Time.now.to_i,
-          :tag => ['tag1'],
+          :tags => ['tag1'],
         },
         identifier,
         { :extension => '.md' }
