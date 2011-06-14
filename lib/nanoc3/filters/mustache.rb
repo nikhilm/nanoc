@@ -1,6 +1,8 @@
 # encoding: utf-8
 
 module Nanoc3::Filters
+
+  # @since 3.2.0
   class Mustache < Nanoc3::Filter
 
     # Runs the content through
@@ -18,4 +20,5 @@ module Nanoc3::Filters
     end
 
   end
+
 end

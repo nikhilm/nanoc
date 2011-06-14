@@ -1,7 +1,5 @@
 # encoding: utf-8
 
-require 'forwardable'
-
 module Nanoc3
 
   # Represents an item representation, but provides an interface that is
@@ -65,9 +63,22 @@ module Nanoc3
       set_assigns
 
       layout = layout_with_identifier(layout_identifier)
-      filter_name, filter_args = @compiler.filter_for_layout(layout)
+      filter_name, filter_args = @compiler.rules_collection.filter_for_layout(layout)
 
       @item_rep.layout(layout, filter_name, filter_args)
+    end
+
+    # Returns true because this item is already a proxy, and therefore doesn’t
+    # need to be wrapped anymore.
+    #
+    # @api private
+    #
+    # @return [true]
+    #
+    # @see Nanoc3::ItemRep#is_proxy?
+    # @see Nanoc3::ItemRepRecorderProxy#is_proxy?
+    def is_proxy?
+      true
     end
 
   private
@@ -76,8 +87,12 @@ module Nanoc3
       @item_rep.assigns = @compiler.assigns_for(@item_rep)
     end
 
+    def layouts
+      @compiler.site.layouts
+    end
+
     def layout_with_identifier(layout_identifier)
-      layout ||= @compiler.site.layouts.find { |l| l.identifier == layout_identifier.cleaned_identifier }
+      layout ||= layouts.find { |l| l.identifier == layout_identifier.cleaned_identifier }
       raise Nanoc3::Errors::UnknownLayout.new(layout_identifier) if layout.nil?
       layout
     end

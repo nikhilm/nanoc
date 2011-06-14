@@ -7,6 +7,8 @@ module Nanoc3
   # store the modification time to speed up compilation.
   class Item
 
+    extend Nanoc3::Memoization
+
     # @return [Hash] This item's attributes
     attr_accessor :attributes
 
@@ -78,10 +80,10 @@ module Nanoc3
 
       # Get rest of params
       @attributes   = attributes.symbolize_keys
-      @identifier   = identifier.cleaned_identifier
+      @identifier   = identifier.cleaned_identifier.freeze
 
       # Set mtime
-      @attributes.merge(:mtime => params[:mtime]) if params[:mtime]
+      @attributes.merge!(:mtime => params[:mtime]) if params[:mtime]
 
       @parent       = nil
       @children     = []
@@ -164,6 +166,12 @@ module Nanoc3
       # Get captured content (hax)
       # TODO [in nanoc 4.0] remove me
       if key.to_s =~ /^content_for_(.*)$/
+        # Warn
+        unless @_content_for_warning_issued
+          warn 'WARNING: Accessing captured content should happen using the #content_for method defined in the Capturing helper instead of using item[:content_for_something]. The latter way of accessing captured content will be removed in nanoc 4.0.'
+          @_content_for_warning_issued = true
+        end
+
         # Include capturing helper if necessary
         unless @_Nanoc3_Helpers_Capturing_included
           self.class.send(:include, ::Nanoc3::Helpers::Capturing)
@@ -223,6 +231,57 @@ module Nanoc3
 
     def inspect
       "<#{self.class}:0x#{self.object_id.to_s(16)} identifier=#{self.identifier} binary?=#{self.binary?}>"
+    end
+
+    # @return [String] The checksum for this object. If its contents change,
+    #   the checksum will change as well.
+    def checksum
+      content_checksum = if binary?
+        if File.exist?(raw_filename)
+          Pathname.new(raw_filename).checksum
+        else
+          ''.checksum
+        end
+      else
+        @raw_content.checksum
+      end
+
+      attributes = @attributes.dup
+      attributes.delete(:file)
+      attributes_checksum = attributes.checksum
+
+      content_checksum + ',' + attributes_checksum
+    end
+    memoize :checksum
+
+    def hash
+      self.class.hash ^ self.identifier.hash
+    end
+
+    def eql?(other)
+      self.class == other.class && self.identifier == other.identifier
+    end
+
+    def ==(other)
+      self.eql?(other)
+    end
+
+    def marshal_dump
+      [
+        @is_binary,
+        @raw_filename,
+        @raw_content,
+        @attributes,
+        @identifier
+      ]
+    end
+
+    def marshal_load(source)
+      @is_binary,
+      @raw_filename,
+      @raw_content,
+      @attributes,
+      @identifier = *source
     end
 
     # @deprecated Access the modification time using `item[:mtime]` instead.

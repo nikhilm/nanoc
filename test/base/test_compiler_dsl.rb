@@ -1,7 +1,5 @@
 # encoding: utf-8
 
-require 'test/helper'
-
 class Nanoc3::CompilerDSLTest < MiniTest::Unit::TestCase
 
   include Nanoc3::TestHelpers
@@ -20,7 +18,7 @@ class Nanoc3::CompilerDSLTest < MiniTest::Unit::TestCase
 
   def test_passthrough
     # Create site
-    Nanoc3::CLI::Base.new.run([ 'create_site', 'bar' ])
+    Nanoc3::CLI::Base.shared_base.run([ 'create_site', 'bar' ])
     FileUtils.cd('bar') do
       # Create rep
       item = Nanoc3::Item.new('foo', { :extension => 'bar' }, '/foo/')
@@ -30,13 +28,14 @@ class Nanoc3::CompilerDSLTest < MiniTest::Unit::TestCase
       site = Nanoc3::Site.new('.')
       site.items << item
       compiler = site.compiler
-      dsl = site.compiler.dsl
+      dsl = site.compiler.rules_collection.dsl
 
       # Create rule
       dsl.passthrough '/foo/'
 
       # Route and compile
-      path = compiler.routing_rule_for(rep).apply_to(rep, :compiler => compiler)
+      rule = compiler.rules_collection.routing_rule_for(rep)
+      path = rule.apply_to(rep, :compiler => compiler)
       compiler.send :compile_rep, rep
 
       # Check result

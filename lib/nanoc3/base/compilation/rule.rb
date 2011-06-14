@@ -16,6 +16,8 @@ module Nanoc3
 
     # @return [Symbol] The name of the snapshot this rule will apply to.
     #   Ignored for compilation rules, but used for routing rules.
+    #
+    # @since 3.2.0
     attr_reader :snapshot_name
 
     # Creates a new item compilation rule with the given identifier regex,
@@ -62,7 +64,7 @@ module Nanoc3
     # @return [void]
     def apply_to(rep, params={})
       compiler = params[:compiler] or raise ArgumentError, "Required :compiler option is missing"
-      rep = Nanoc3::ItemRepProxy.new(rep, compiler)
+      rep = Nanoc3::ItemRepProxy.new(rep, compiler) unless rep.is_proxy?
       Nanoc3::RuleContext.new(:rep => rep, :compiler => compiler).instance_eval &@block
     end
 

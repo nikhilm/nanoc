@@ -26,11 +26,13 @@ module Nanoc3::ArrayExtensions
 
   # Freezes the contents of the array, as well as all array elements. The
   # array elements will be frozen using {#freeze_recursively} if they respond
-  # to that message, or {#freeze} if they do not.
+  # to that message, or #freeze if they do not.
   #
   # @see Hash#freeze_recursively
   #
   # @return [void]
+  #
+  # @since 3.2.0
   def freeze_recursively
     freeze
     each do |value|

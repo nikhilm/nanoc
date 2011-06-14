@@ -2,7 +2,7 @@
 
 module Nanoc3::CLI::Commands
 
-  class Autocompile < Cri::Command
+  class Autocompile < ::Nanoc3::CLI::Command
 
     def name
       'autocompile'
@@ -48,9 +48,6 @@ module Nanoc3::CLI::Commands
 
     def run(options, arguments)
       require 'rack'
-
-      # Warn
-      warn 'WARNING: As of nanoc 3.2, the autocompiler is deprecated. Consider using the new and much faster “nanoc watch” command that recompiles the site on change rather than on request.'
 
       # Make sure we are in a nanoc site directory
       @base.require_site

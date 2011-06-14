@@ -1,7 +1,5 @@
 # encoding: utf-8
 
-require 'test/helper'
-
 class Nanoc3::ItemRepTest < MiniTest::Unit::TestCase
 
   include Nanoc3::TestHelpers
@@ -131,7 +129,7 @@ class Nanoc3::ItemRepTest < MiniTest::Unit::TestCase
 
     # Layout
     item_rep.assigns = {}
-    item_rep.layout(layout, :erb, [])
+    item_rep.layout(layout, :erb, {})
     assert_equal(%[blah], item_rep.instance_eval { @content[:last] })
   end
 

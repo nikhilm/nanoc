@@ -1,7 +1,5 @@
 # encoding: utf-8
 
-require 'test/helper'
-
 class Nanoc3::Filters::RDocTest < MiniTest::Unit::TestCase
 
   include Nanoc3::TestHelpers
@@ -12,7 +10,7 @@ class Nanoc3::Filters::RDocTest < MiniTest::Unit::TestCase
 
     # Run filter
     result = filter.run("= Foo")
-    assert_equal("<h1>Foo</h1>\n", result)
+    assert_match(%r{<h1>Foo</h1>\Z}, result)
   end
 
 end

@@ -27,9 +27,11 @@ module Nanoc3::CLI
       'rack/cache'     => 'rack-cache',
       'rainpress'      => 'rainpress',
       'rdiscount'      => 'rdiscount',
+      'redcarpet'      => 'redcarpet',
       'redcloth'       => 'redcloth',
       'rubypants'      => 'rubypants',
       'sass'           => 'sass',
+      'systemu'        => 'systemu',
       'w3c_validators' => 'w3c_validators'
     }
 
@@ -66,6 +68,8 @@ module Nanoc3::CLI
     end
 
     # @return [Boolean] true if debug output is enabled, false if not
+    #
+    # @since 3.2.0
     def debug?
       @debug
     end
@@ -111,6 +115,9 @@ module Nanoc3::CLI
         end
       end
 
+      # Load custom commands
+      Dir['./lib/commands/*.rb'].each { |f| require f }
+
       super(args)
     rescue Interrupt => e
       exit(1)
@@ -148,10 +155,10 @@ module Nanoc3::CLI
       $stderr.puts
       $stderr.puts '=== COMPILATION STACK:'
       $stderr.puts
-      if ((self.site && self.site.compiler.stack) || []).empty?
+      if stack.empty?
         $stderr.puts "  (empty)"
       else
-        self.site.compiler.stack.reverse.each do |obj|
+        stack.reverse.each do |obj|
           if obj.is_a?(Nanoc3::ItemRep)
             $stderr.puts "  - [item]   #{obj.item.identifier} (rep #{obj.name})"
           else # layout
@@ -161,7 +168,6 @@ module Nanoc3::CLI
       end
 
       # Backtrace
-      require 'enumerator'
       $stderr.puts
       $stderr.puts '=== BACKTRACE:'
       $stderr.puts
@@ -178,7 +184,9 @@ module Nanoc3::CLI
       case error
       when LoadError
         # Get gem name
-        lib_name = error.message.match(/no such file to load -- ([^\s]+)/)[1]
+        matches = error.message.match(/no such file to load -- ([^\s]+)/)
+        return nil if matches.empty?
+        lib_name = matches[1]
         gem_name = GEM_NAMES[$1]
 
         # Build message
@@ -188,8 +196,10 @@ module Nanoc3::CLI
       when RuntimeError
         if error.message =~ /^can't modify frozen/
           "You attempted to modify immutable data. Some data, such as " \
-          "item/layout attributes and raw item/layout content, can no " \
-          "longer be modified once compilation has started."
+          "item/layout attributes and raw item/layout content, can not " \
+          "be modified once compilation has started. (This was " \
+          "unintentionally possible in 3.1.x and before, but has been " \
+          "disabled in 3.2.x in order to allow compiler optimisations.)"
         end
       end
     end
@@ -256,13 +266,13 @@ module Nanoc3::CLI
     end
 
     # @see Cri::Base#handle_option
-    def handle_option(option)
-      case option
+    def handle_option(key, value, command)
+      case key
       when :version
         gem_info = defined?(Gem) ? "with RubyGems #{Gem::VERSION}" : "without RubyGems"
         engine   = defined?(RUBY_ENGINE) ? RUBY_ENGINE : "ruby"
 
-        puts "nanoc #{Nanoc3::VERSION} (c) 2007-2010 Denis Defreyne."
+        puts "nanoc #{Nanoc3::VERSION} (c) 2007-2011 Denis Defreyne."
         puts "Running #{engine} #{RUBY_VERSION} (#{RUBY_RELEASE_DATE}) on #{RUBY_PLATFORM} #{gem_info}"
         exit 0
       when :verbose
@@ -276,9 +286,15 @@ module Nanoc3::CLI
       when :'no-color'
         Nanoc3::CLI::Logger.instance.color = false
       when :help
-        show_help
+        show_help(command)
         exit 0
       end
+    end
+
+  protected
+
+    def stack
+      (self.site && self.site.compiler.stack) || []
     end
 
   end

@@ -40,6 +40,8 @@ module Nanoc3
   #   the specified object.
   class Compiler
 
+    extend Nanoc3::Memoization
+
     # @group Accessors
 
     # @return [Nanoc3::Site] The site this compiler belongs to
@@ -52,24 +54,6 @@ module Nanoc3
     # @return [Array] The compilation stack
     attr_reader :stack
 
-    # @return [Array<Nanoc3::Rule>] The list of item compilation rules that
-    #   will be used to compile items.
-    attr_reader :item_compilation_rules
-
-    # @return [Array<Nanoc3::Rule>] The list of routing rules that will be
-    #   used to give all items a path.
-    attr_reader :item_routing_rules
-
-    # The hash containing layout-to-filter mapping rules. This hash is
-    # ordered: iterating over the hash will happen in insertion order.
-    #
-    # @return [Hash] The layout-to-filter mapping rules
-    attr_reader :layout_filter_mapping
-
-    # @return [Proc] The code block that will be executed after all data is
-    #   loaded but before the site is compiled
-    attr_accessor :preprocessor
-
     # @group Public instance methods
 
     # Creates a new compiler fo the given site
@@ -79,10 +63,6 @@ module Nanoc3
       @site = site
 
       @stack = []
-
-      @item_compilation_rules  = []
-      @item_routing_rules      = []
-      @layout_filter_mapping   = OrderedHash.new
     end
 
     # Compiles the site and writes out the compiled item representations.
@@ -112,6 +92,13 @@ module Nanoc3
 
     # @group Private instance methods
 
+    # @return [Nanoc3::RulesCollection] The collection of rules to be used
+    #   for compiling this site
+    def rules_collection
+      Nanoc3::RulesCollection.new(self)
+    end
+    memoize :rules_collection
+
     # Load the helper data that is used for compiling the site.
     #
     # @api private
@@ -122,10 +109,10 @@ module Nanoc3
       @loading = true
 
       # Load site if necessary
-      @site.load
+      site.load
 
       # Preprocess
-      load_rules
+      rules_collection.load
       preprocess
       site.setup_child_parent_links
       build_reps
@@ -135,7 +122,6 @@ module Nanoc3
       stores.each { |s| s.load }
 
       # Determine which reps need to be recompiled
-      dependency_tracker.propagate_outdatedness
       forget_dependencies_if_outdated(items)
 
       @loaded = true
@@ -159,14 +145,11 @@ module Nanoc3
 
       @stack = []
 
-      @item_compilation_rules  = []
-      @item_routing_rules      = []
-      @layout_filter_mapping   = OrderedHash.new
+      items.each { |item| item.reps.clear }
+      site.teardown_child_parent_links
+      rules_collection.unload
 
-      @site.items.each { |item| item.reps.clear }
-      @site.teardown_child_parent_links
-
-      @site.unload
+      site.unload
 
       @loaded = false
       @unloading = false
@@ -178,6 +161,17 @@ module Nanoc3
     #
     # @return [void]
     def store
+      # Calculate rule memory
+      (reps + layouts).each do |obj|
+        rule_memory_store[obj] = rule_memory_calculator[obj]
+      end
+
+      # Calculate checksums
+      self.objects.each do |obj|
+        checksum_store[obj] = obj.checksum
+      end
+
+      # Store
       stores.each { |s| s.store }
     end
 
@@ -188,132 +182,18 @@ module Nanoc3
     #
     # @return [Nanoc3::DependencyTracker] The dependency tracker for this site
     def dependency_tracker
-      @dependency_tracker ||= begin
-        dt = Nanoc3::DependencyTracker.new(@site.items + @site.layouts)
-        dt.compiler = self
-        dt
-      end
+      dt = Nanoc3::DependencyTracker.new(@site.items + @site.layouts)
+      dt.compiler = self
+      dt
     end
-
-    # Finds the first matching compilation rule for the given item
-    # representation.
-    #
-    # @api private
-    #
-    # @param [Nanoc3::ItemRep] rep The item rep for which to fetch the rule
-    #
-    # @return [Nanoc3::Rule, nil] The compilation rule for the given item rep,
-    #   or nil if no rules have been found
-    def compilation_rule_for(rep)
-      @item_compilation_rules.find do |rule|
-        rule.applicable_to?(rep.item) && rule.rep_name == rep.name
-      end
-    end
-
-    # Finds the first matching routing rule for the given item representation.
-    #
-    # @api private
-    #
-    # @param [Nanoc3::ItemRep] rep The item rep for which to fetch the rule
-    #
-    # @return [Nanoc3::Rule, nil] The routing rule for the given item rep, or
-    #   nil if no rules have been found
-    def routing_rule_for(rep)
-      @item_routing_rules.find do |rule|
-        rule.applicable_to?(rep.item) && rule.rep_name == rep.name
-      end
-    end
-
-    # Returns the list of routing rules that can be applied to the given item
-    # representation. For each snapshot, the first matching rule will be
-    # returned. The result is a hash containing the corresponding rule for
-    # each snapshot.
-    #
-    # @api private
-    #
-    # @return [Hash<Symbol, Nanoc3::Rule>] The routing rules for the given rep
-    def routing_rules_for(rep)
-      rules = {}
-      @item_routing_rules.each do |rule|
-        next if !rule.applicable_to?(rep.item)
-        next if rule.rep_name != rep.name
-        next if rules.has_key?(rule.snapshot_name)
-
-        rules[rule.snapshot_name] = rule
-      end
-      rules
-    end
-
-    # Finds the filter name and arguments to use for the given layout.
-    #
-    # @api private
-    #
-    # @param [Nanoc3::Layout] layout The layout for which to fetch the filter.
-    #
-    # @return [Array, nil] A tuple containing the filter name and the filter 
-    #   arguments for the given layout.
-    def filter_for_layout(layout)
-      @layout_filter_mapping.each_pair do |layout_identifier, filter_name_and_args|
-        return filter_name_and_args if layout.identifier =~ layout_identifier
-      end
-      nil
-    end
-
-    # @api private
-    #
-    # @return [Boolean] true if the object is outdated, false otherwise
-    def outdated?(obj)
-      outdatedness_checker.outdated?(obj)
-    end
-
-    # Returns the reason why the given object is outdated.
-    #
-    # @see Nanoc3::OutdatednessChecker#outdatedness_reason_for
-    #
-    # @api private
-    def outdatedness_reason_for(obj)
-      outdatedness_checker.outdatedness_reason_for(obj)
-    end
-
-    # Checks whether the given item representation needs to be recompiled.
-    # This is the case if the representation itself has changed, or when any
-    # of the dependent items need to be recompiled.
-    #
-    # @api private
-    #
-    # @return [Boolean] true if the given item representation needs to be
-    #   recompiled, false otherwise.
-    def needs_recompiling?(rep)
-      outdated?(rep) || dependency_tracker.outdated_due_to_dependencies?(rep.item)
-    end
-
-    # Returns the Nanoc3::CompilerDSL that should be used for this site.
-    #
-    # @api private
-    def dsl
-      @dsl ||= Nanoc3::CompilerDSL.new(self)
-    end
-
-    # Loads this site’s rules.
-    #
-    # @api private
-    def load_rules
-      # Find rules file
-      rules_filename = [ 'Rules', 'rules', 'Rules.rb', 'rules.rb' ].find { |f| File.file?(f) }
-      raise Nanoc3::Errors::NoRulesFileFound.new if rules_filename.nil?
-
-      # Get rule data
-      @rules = File.read(rules_filename)
-
-      # Load DSL
-      dsl.instance_eval(@rules, "./#{rules_filename}")
-    end
+    memoize :dependency_tracker
 
     # Runs the preprocessor.
     #
     # @api private
     def preprocess
-      preprocessor_context.instance_eval(&preprocessor) if preprocessor
+      return if rules_collection.preprocessor.nil?
+      preprocessor_context.instance_eval(&rules_collection.preprocessor)
     end
 
     # Returns all objects managed by the site (items, layouts, code snippets,
@@ -321,23 +201,8 @@ module Nanoc3
     #
     # @api private
     def objects
-      # FIXME remove reference to rules
-      site.items + site.layouts + site.code_snippets + [ site.config, self.rules_with_reference ]
-    end
-
-    # Returns the rules along with an unique reference (`:rules`) so that the
-    # outdatedness checker can use them.
-    #
-    # @api private
-    def rules_with_reference
-      rules = @rules
-      @rules_pseudo ||= begin
-        pseudo = Object.new
-        pseudo.instance_eval { @data = rules }
-        def pseudo.reference ; :rules ; end
-        def pseudo.data ; @data.inspect ; end
-        pseudo
-      end
+      site.items + site.layouts + site.code_snippets +
+        [ site.config, rules_collection ]
     end
 
     # Creates the representations of all items as defined by the compilation
@@ -345,9 +210,9 @@ module Nanoc3
     #
     # @api private
     def build_reps
-      @site.items.each do |item|
+      items.each do |item|
         # Find matching rules
-        matching_rules = item_compilation_rules.select { |r| r.applicable_to?(item) }
+        matching_rules = rules_collection.item_compilation_rules_for(item)
         raise Nanoc3::Errors::NoMatchingCompilationRuleFound.new(item) if matching_rules.empty?
 
         # Create reps
@@ -362,10 +227,9 @@ module Nanoc3
     #
     # @api private
     def route_reps
-      reps = @site.items.map { |i| i.reps }.flatten
       reps.each do |rep|
         # Find matching rules
-        rules = routing_rules_for(rep)
+        rules = rules_collection.routing_rules_for(rep)
         raise Nanoc3::Errors::NoMatchingRoutingRuleFound.new(rep) if rules[:last].nil?
 
         rules.each_pair do |snapshot, rule|
@@ -416,15 +280,34 @@ module Nanoc3
       })
     end
 
+    # @return [Nanoc3::OutdatednessChecker] The outdatedness checker
+    def outdatedness_checker
+      Nanoc3::OutdatednessChecker.new(
+        :site => @site,
+        :checksum_store => checksum_store,
+        :dependency_tracker => dependency_tracker)
+    end
+    memoize :outdatedness_checker
+
   private
 
+    # @return [Array<Nanoc3::Item>] The site’s items
     def items
-      @items ||= @site.items
+      @site.items
     end
+    memoize :items
 
+    # @return [Array<Nanoc3::ItemRep>] The site’s item representations
     def reps
-      @reps ||= items.map { |i| i.reps }.flatten
+      items.map { |i| i.reps }.flatten
     end
+    memoize :reps
+
+    # @return [Array<Nanoc3::Layout>] The site’s layouts
+    def layouts
+      @site.layouts
+    end
+    memoize :layouts
 
     # Compiles the given representations.
     #
@@ -432,17 +315,7 @@ module Nanoc3
     #
     # @return [void]
     def compile_reps(reps)
-      require 'set'
-
-      # Partition in outdated and non-outdated
-      outdated_reps = Set.new
-      skipped_reps  = Set.new
-      reps.each do |rep|
-        target = needs_recompiling?(rep) ? outdated_reps : skipped_reps
-        target.add(rep)
-      end
-
-      # Build graph for outdated reps
+      outdated_reps = Set.new(reps.select { |rep| outdatedness_checker.outdated?(rep) })
       content_dependency_graph = Nanoc3::DirectedGraph.new(outdated_reps)
 
       # Listen to processing start/stop
@@ -462,7 +335,6 @@ module Nanoc3
         rescue Nanoc3::Errors::UnmetDependency => e
           content_dependency_graph.add_edge(e.rep, rep)
           unless content_dependency_graph.vertices.include?(e.rep)
-            skipped_reps.delete(e.rep)
             content_dependency_graph.add_vertex(e.rep)
           end
         end
@@ -491,13 +363,18 @@ module Nanoc3
       Nanoc3::NotificationCenter.post(:processing_started,  rep)
       Nanoc3::NotificationCenter.post(:visit_started,       rep.item)
 
-      if !needs_recompiling?(rep) && compiled_content_cache[rep]
+      # Calculate rule memory if we haven’t yet done do
+      rules_collection.new_rule_memory_for_rep(rep)
+
+      if !outdatedness_checker.outdated?(rep) && compiled_content_cache[rep]
+        # Reuse content
         Nanoc3::NotificationCenter.post(:cached_content_used, rep)
         rep.content = compiled_content_cache[rep]
       else
+        # Recalculate content
         rep.snapshot(:raw)
         rep.snapshot(:pre, :final => false)
-        compilation_rule_for(rep).apply_to(rep, :compiler => self)
+        rules_collection.compilation_rule_for(rep).apply_to(rep, :compiler => self)
         rep.snapshot(:post) if rep.has_snapshot?(:post)
         rep.snapshot(:last)
       end
@@ -522,7 +399,7 @@ module Nanoc3
     # @return [void]
     def forget_dependencies_if_outdated(items)
       items.each do |i|
-        if i.reps.any? { |r| needs_recompiling?(r) }
+        if i.reps.any? { |r| outdatedness_checker.outdated?(r) }
           dependency_tracker.forget_dependencies_for(i)
         end
       end
@@ -530,33 +407,48 @@ module Nanoc3
 
     # Returns a preprocessor context, creating one if none exists yet.
     def preprocessor_context
-      @preprocessor_context ||= Nanoc3::Context.new({
+      Nanoc3::Context.new({
         :site    => @site,
         :config  => @site.config,
         :items   => @site.items,
         :layouts => @site.layouts
       })
     end
+    memoize :preprocessor_context
 
     # @return [CompiledContentCache] The compiled content cache
     def compiled_content_cache
-      @compiled_content_cache ||= Nanoc3::CompiledContentCache.new
+      Nanoc3::CompiledContentCache.new
     end
+    memoize :compiled_content_cache
 
     # @return [ChecksumStore] The checksum store
     def checksum_store
-      @checksum_store ||= Nanoc3::ChecksumStore.new(:site => @site)
+      Nanoc3::ChecksumStore.new(:site => @site)
     end
+    memoize :checksum_store
 
-    # @return [Nanoc3::OutdatednessChecker] The outdatedness checker
-    def outdatedness_checker
-      @outdatedness_checker ||= Nanoc3::OutdatednessChecker.new(:site => @site, :checksum_store => checksum_store)
+    # @return [RuleMemoryStore] The rule memory store
+    def rule_memory_store
+      Nanoc3::RuleMemoryStore.new(:site => @site)
     end
+    memoize :rule_memory_store
+
+    # @return [RuleMemoryCalculator] The rule memory calculator
+    def rule_memory_calculator
+      Nanoc3::RuleMemoryCalculator.new(:rules_collection => rules_collection)
+    end
+    memoize :rule_memory_calculator
 
     # Returns all stores that can load/store data that can be used for
     # compilation.
     def stores
-      [ compiled_content_cache, checksum_store, dependency_tracker ]
+      [
+        checksum_store,
+        compiled_content_cache,
+        dependency_tracker,
+        rule_memory_store
+      ]
     end
 
   end

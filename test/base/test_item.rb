@@ -1,7 +1,5 @@
 # encoding: utf-8
 
-require 'test/helper'
-
 class Nanoc3::ItemTest < MiniTest::Unit::TestCase
 
   include Nanoc3::TestHelpers
@@ -17,6 +15,15 @@ class Nanoc3::ItemTest < MiniTest::Unit::TestCase
     item = Nanoc3::Item.new("foo", {}, '/foo')
 
     assert_equal '/foo/', item.identifier
+  end
+
+  def test_frozen_identifier
+    item = Nanoc3::Item.new("foo", {}, '/foo')
+
+    error = assert_raises(RuntimeError) do
+      item.identifier.chop!
+    end
+    assert_equal "can't modify frozen string", error.message
   end
 
   def test_lookup
@@ -150,6 +157,19 @@ class Nanoc3::ItemTest < MiniTest::Unit::TestCase
       assert_match /^can't modify frozen /, e.message
     end
     assert raised
+  end
+
+  def test_dump_and_load
+    item = Nanoc3::Item.new(
+      "foobar",
+      { :a => { :b => 123 }},
+      '/foo/')
+
+    item = Marshal.load(Marshal.dump(item))
+
+    assert_equal '/foo/', item.identifier
+    assert_equal 'foobar', item.raw_content
+    assert_equal({ :a => { :b => 123 }}, item.attributes)
   end
 
 end

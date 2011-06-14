@@ -13,16 +13,17 @@ Gem::Specification.new do |s|
   s.author = 'Denis Defreyne'
   s.email  = 'denis.defreyne@stoneship.org'
 
-  s.files              = Dir['[A-Z]*'] + Dir['lib/**/*'] + Dir['doc/yardoc_templates/**/*'] + [ 'nanoc3.gemspec' ]
-  s.default_executable = 'nanoc3'
+  s.files              = Dir['[A-Z]*'] +
+                         Dir['doc/yardoc_templates/**/*'] +
+                         Dir['{bin,lib,tasks,test}/**/*'] +
+                         [ 'nanoc3.gemspec', '.gemtest' ]
   s.executables        = [ 'nanoc3' ]
   s.require_paths      = [ 'lib' ]
 
-  s.has_rdoc         = 'yard'
   s.rdoc_options     = [ '--main', 'README.md' ]
   s.extra_rdoc_files = [ 'ChangeLog', 'LICENSE', 'README.md', 'NEWS.md' ]
 
-  s.add_runtime_dependency('cri', '>= 1.0.0')
+  s.add_runtime_dependency('cri', '>= 1.1.0')
 
   s.post_install_message = %q{------------------------------------------------------------------------------
 Thanks for installing nanoc 3.2! Here are some resources to help you get

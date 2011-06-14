@@ -2,7 +2,7 @@
 
 module Nanoc3::CLI::Commands
 
-  class Compile < Cri::Command
+  class Compile < ::Nanoc3::CLI::Command
 
     def name
       'compile'
@@ -166,7 +166,6 @@ module Nanoc3::CLI::Commands
       # Check whether there’s a different
       return if old_content == new_content
 
-      require 'thread'
       @diff_threads << Thread.new do
         # Generate diff
         diff = diff_strings(old_content, new_content)
@@ -182,7 +181,6 @@ module Nanoc3::CLI::Commands
 
     # TODO move this elsewhere
     def diff_strings(a, b)
-      require 'tempfile'
       require 'open3'
 
       # Create files

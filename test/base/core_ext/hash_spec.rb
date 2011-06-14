@@ -1,7 +1,5 @@
 # encoding: utf-8
 
-require 'test/helper'
-
 describe 'Hash#symbolize_keys' do
 
   it 'should convert keys to symbols' do
@@ -68,6 +66,15 @@ describe 'Hash#freeze_recursively' do
       assert_match /^can't modify frozen /, e.message
     end
     assert raised
+  end
+
+end
+
+describe 'Hash#checksum' do
+
+  it 'should work' do
+    expectation = 'fec9ae7163e8b8d57a15d51821d2c68d4a6bb169'
+    { :foo => 123 }.checksum.must_equal expectation
   end
 
 end

@@ -2,7 +2,7 @@
 
 module Nanoc3::CLI::Commands
 
-  class CreateSite < Cri::Command
+  class CreateSite < ::Nanoc3::CLI::Command
 
     class << self
 
@@ -82,6 +82,9 @@ EOS
 
 # A few helpful tips about the Rules file:
 #
+# * The string given to #compile and #route are matching patterns for
+#   identifiers--not for paths. Therefore, you can’t match on extension.
+#
 # * The order of rules is important: for each item, only the first matching
 #   rule is applied.
 #
@@ -95,8 +98,12 @@ compile '/stylesheet/' do
 end
 
 compile '*' do
-  filter :erb
-  layout 'default'
+  if item.binary?
+    # don’t filter binary items
+  else
+    filter :erb
+    layout 'default'
+  end
 end
 
 route '/stylesheet/' do
@@ -105,10 +112,10 @@ end
 
 route '*' do
   if item.binary?
-    # /foo/ -> /foo.ext
+    # Write item with identifier /foo/ to /foo.ext
     item.identifier.chop + '.' + item[:extension]
   else
-    # /foo/ -> /foo/index.html
+    # Write item with identifier /foo/ to /foo/index.html
     item.identifier + 'index.html'
   end
 end
@@ -180,16 +187,18 @@ a:hover {
   line-height: 20px;
 }
 
-#main ul {
+#main ul, #main ol {
   margin: 20px;
 }
 
 #main li {
-  list-style-type: square;
-
   font-size: 15px;
   
   line-height: 20px;
+}
+
+#main ul li {
+  list-style-type: square;
 }
 
 #sidebar {

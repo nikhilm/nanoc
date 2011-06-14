@@ -28,7 +28,6 @@ module Nanoc3::Filters
       engine = ::Sass::Engine.new(content, options)
 
       # Get import nodes
-      require 'set'
       imported_nodes = []
       unprocessed_nodes = Set.new([ engine.to_tree ])
       until unprocessed_nodes.empty?
@@ -46,27 +45,36 @@ module Nanoc3::Filters
       # Get import paths
       import_paths = (options[:load_paths] || []).dup
       import_paths.unshift(File.dirname(sass_filename)) if sass_filename
-      # Get imported filenames
-      imported_filenames = imported_nodes.map do |node|
-        ::Sass::Files.find_file_to_import(node.imported_filename, import_paths)
-      end
+      imported_filenames = imported_nodes.map { |node| node.imported_filename }
 
       # Convert to items
       imported_items = imported_filenames.map do |filename|
-        pathname = Pathname.new(filename)
-        next unless pathname.file?
-        normalized_filename = pathname.realpath
-        @items.find { |i| i[:content_filename] && Pathname.new(i[:content_filename]).realpath == normalized_filename }
+        # Find directory for this item
+        current_dir_pathname = Pathname.new(@item[:content_filename]).dirname.realpath
+
+        # Find absolute pathname for imported item
+        imported_pathname    = Pathname.new(filename)
+        if imported_pathname.relative?
+          imported_pathname = current_dir_pathname + imported_pathname
+        end
+        next if !imported_pathname.exist?
+        imported_filename = imported_pathname.realpath
+
+        # Find matching item
+        @items.find do |i|
+          next if i[:content_filename].nil?
+          Pathname.new(i[:content_filename]).realpath == imported_filename
+        end
       end.compact
 
       # Require compilation of each item
-      imported_items.each do |item|
+      imported_items.each do |i|
         # Notify
-        Nanoc3::NotificationCenter.post(:visit_started, item)
-        Nanoc3::NotificationCenter.post(:visit_ended,   item)
+        Nanoc3::NotificationCenter.post(:visit_started, i)
+        Nanoc3::NotificationCenter.post(:visit_ended,   i)
 
         # Raise unmet dependency error if item is not yet compiled
-        any_uncompiled_rep = item.reps.find { |r| !r.compiled? }
+        any_uncompiled_rep = i.reps.find { |r| !r.compiled? }
         raise Nanoc3::Errors::UnmetDependency.new(any_uncompiled_rep) if any_uncompiled_rep
       end
 

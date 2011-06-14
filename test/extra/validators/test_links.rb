@@ -1,7 +1,5 @@
 # encoding: utf-8
 
-require 'test/helper'
-
 class Nanoc3::Extra::Validators::LinksTest < MiniTest::Unit::TestCase
 
   include Nanoc3::TestHelpers
@@ -12,6 +10,7 @@ class Nanoc3::Extra::Validators::LinksTest < MiniTest::Unit::TestCase
 
     # Test
     assert  validator.send(:is_external_href?, 'http://example.com/')
+    assert  validator.send(:is_external_href?, 'https://example.com/')
     assert  validator.send(:is_external_href?, 'mailto:bob@example.com')
     assert !validator.send(:is_external_href?, '../stuff')
     assert !validator.send(:is_external_href?, '/stuff')
@@ -44,6 +43,7 @@ class Nanoc3::Extra::Validators::LinksTest < MiniTest::Unit::TestCase
 
     # Test
     assert validator.send(:is_valid_external_href?, 'http://example.com/')
+    assert validator.send(:is_valid_external_href?, 'https://example.com/')
     assert validator.send(:is_valid_external_href?, 'foo://example.com/')
     refute validator.send(:is_valid_external_href?, 'http://example.com/">')
   end

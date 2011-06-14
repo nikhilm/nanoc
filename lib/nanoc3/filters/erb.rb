@@ -1,12 +1,16 @@
-# encoding: utf-8
+# encoding: utf-8                                                                                                           
 
 module Nanoc3::Filters
   class ERB < Nanoc3::Filter
 
     # Runs the content through [ERB](http://ruby-doc.org/stdlib/libdoc/erb/rdoc/classes/ERB.html).
-    # This method takes no options.
     #
     # @param [String] content The content to filter
+    #
+    # @option params [Integer] safe_level (nil) The safe level (`$SAFE`) to
+    #   use while running this filter
+    #
+    # @option params [String] trim_mode (nil) The trim mode to use
     #
     # @return [String] The filtered content
     def run(content, params={})
@@ -15,11 +19,17 @@ module Nanoc3::Filters
       # Create context
       context = ::Nanoc3::Context.new(assigns)
 
-      # Get result
-      erb = ::ERB.new(content)
-      erb.filename = filename
-      erb.result(context.get_binding { assigns[:content] })
-    end
+      # Get binding
+      proc = assigns[:content] ? lambda { assigns[:content] } : nil 
+      assigns_binding = context.get_binding(&proc)
 
-  end
+      # Get result
+      safe_level = params[:safe_level]
+      trim_mode = params[:trim_mode]
+      erb = ::ERB.new(content, safe_level, trim_mode)
+      erb.filename = filename
+      erb.result(assigns_binding)
+    end 
+
+  end 
 end

@@ -28,12 +28,14 @@ directories:
 * `cli` contains the commandline interface
 * `data_sources` contains the standard data sources ({Nanoc3::DataSource}
   subclasses), such as the filesystem data source
-* `helpers` contains helpers, which provide functionality some sites
-  may find useful, such as the blogging and tagging helpers
 * `extra` contains stuff that is not needed by nanoc itself, but which may
   be used by helpers, data sources, filters or VCSes.
 * `filters` contains the standard filters ({Nanoc3::Filter} subclasses)
-  such as ERB, Markdown, Haml, ...
+  such as ERB, Markdown, Haml, …
+* `helpers` contains helpers, which provide functionality some sites
+  may find useful, such as the blogging and tagging helpers
+* `tasks` contains rake tasks that perform a variety of functions such as
+  validating HTML and CSS, uploading compiled files, …
 
 The namespaces (modules) are organised like this:
 
@@ -74,11 +76,17 @@ may be interested in the development dependencies:
 * Dmitry Bilunov
 * Devon Luke Buchanan
 * Brian Candler
+* Michal Cichra
+* Zaiste de Grengolada
 * Vincent Driessen
 * Chris Eppstein
+* Jeff Forcier
 * Felix Hanley
+* Justin Hileman
 * Starr Horne
 * Tuomas Kareinen
+* Nikhil Marathe
+* Daniel Mendler
 * Ale Muñoz
 * Nicky Peeters
 * Christian Plessl
@@ -87,6 +95,8 @@ may be interested in the development dependencies:
 * “Soryu”
 * Eric Sunshine
 * Dennis Sutch
+* Matthias Vallentin
+* Toon Willems
 
 ## Contact
 
